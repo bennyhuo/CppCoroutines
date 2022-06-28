@@ -31,14 +31,12 @@ struct Channel {
     if (!buffer.empty()) {
       auto value = buffer.front();
       buffer.pop();
-      lock.unlock();
       reader_awaiter->resume(value);
       
       if (!writer_list.empty()) {
         auto writer = writer_list.front();
         writer_list.pop_front();
         buffer.push(writer->_value);
-        lock.unlock();
         writer->resume();
       }
       return;
