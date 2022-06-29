@@ -28,6 +28,25 @@ struct Channel {
     std::unique_lock lock(channel_lock);
     check_closed();
 
+    if (!buffer.empty()) {
+      auto value = buffer.front();
+      buffer.pop();
+
+      if (!writer_list.empty()) {
+        auto writer = writer_list.front();
+        writer_list.pop_front();
+        buffer.push(writer->_value);
+        lock.unlock();
+
+        writer->resume();
+      } else {
+        lock.unlock();
+      }
+
+      reader_awaiter->resume(value);
+      return;
+    }
+
     if (!writer_list.empty()) {
       auto writer = writer_list.front();
       writer_list.pop_front();
@@ -35,15 +54,6 @@ struct Channel {
 
       reader_awaiter->resume(writer->_value);
       writer->resume();
-      return;
-    }
-
-    if (!buffer.empty()) {
-      auto value = buffer.front();
-      buffer.pop();
-      lock.unlock();
-
-      reader_awaiter->resume(value);
       return;
     }
 

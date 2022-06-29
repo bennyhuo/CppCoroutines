@@ -15,9 +15,10 @@ Task<void, LooperExecutor> Producer(Channel<int> &channel) {
     debug("send: ", i);
 //    co_await channel.write(i++);
     co_await (channel << i++);
-    co_await 800ms;
+    co_await 50ms;
   }
 
+  co_await 5s;
   channel.close();
   debug("close channel, exit.");
 }
@@ -53,7 +54,7 @@ Task<void, LooperExecutor> Consumer2(Channel<int> &channel) {
 }
 
 void test_channel() {
-  auto channel = Channel<int>(2);
+  auto channel = Channel<int>(5);
   auto producer = Producer(channel);
   auto consumer = Consumer(channel);
   auto consumer2 = Consumer2(channel);
