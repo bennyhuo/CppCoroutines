@@ -16,6 +16,10 @@
 #include "TaskAwaiter.h"
 #include "SleepAwaiter.h"
 #include "ChannelAwaiter.h"
+#include "CommonAwaiter.h"
+
+template<typename AwaiterImpl, typename R>
+concept AwaiterImplRestriction = std::is_base_of<Awaiter<R>, AwaiterImpl>::value;
 
 template<typename ResultType, typename Executor>
 class Task;
@@ -32,24 +36,19 @@ struct TaskPromise {
 
   template<typename _ResultType, typename _Executor>
   TaskAwaiter<_ResultType, _Executor> await_transform(Task<_ResultType, _Executor> &&task) {
-    return TaskAwaiter<_ResultType, _Executor>(&executor, std::move(task));
+    return await_transform(TaskAwaiter<_ResultType, _Executor>(std::move(task)));
   }
 
   template<typename _Rep, typename _Period>
-  SleepAwaiter await_transform(std::chrono::duration<_Rep, _Period> &&duration) {
-    return SleepAwaiter(&executor, std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+  auto await_transform(std::chrono::duration<_Rep, _Period> &&duration) {
+    return await_transform(SleepAwaiter(duration));
   }
 
-  template<typename _ValueType>
-  auto await_transform(ReaderAwaiter<_ValueType> reader_awaiter) {
-    reader_awaiter.executor = &executor;
-    return reader_awaiter;
-  }
-
-  template<typename _ValueType>
-  auto await_transform(WriterAwaiter<_ValueType> writer_awaiter) {
-    writer_awaiter.executor = &executor;
-    return writer_awaiter;
+  template<typename AwaiterImpl>
+  requires AwaiterImplRestriction<AwaiterImpl, typename AwaiterImpl::ResultType>
+  AwaiterImpl await_transform(AwaiterImpl awaiter) {
+    awaiter.install_executor(&executor);
+    return awaiter;
   }
 
   void unhandled_exception() {
@@ -118,24 +117,19 @@ struct TaskPromise<void, Executor> {
 
   template<typename _ResultType, typename _Executor>
   TaskAwaiter<_ResultType, _Executor> await_transform(Task<_ResultType, _Executor> &&task) {
-    return TaskAwaiter<_ResultType, _Executor>(&executor, std::move(task));
+    return await_transform(TaskAwaiter<_ResultType, _Executor>(std::move(task)));
   }
 
   template<typename _Rep, typename _Period>
   SleepAwaiter await_transform(std::chrono::duration<_Rep, _Period> &&duration) {
-    return SleepAwaiter(&executor, std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+    return await_transform(SleepAwaiter(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()));
   }
 
-  template<typename _ValueType>
-  auto await_transform(ReaderAwaiter<_ValueType> reader_awaiter) {
-    reader_awaiter.executor = &executor;
-    return reader_awaiter;
-  }
-
-  template<typename _ValueType>
-  auto await_transform(WriterAwaiter<_ValueType> writer_awaiter) {
-    writer_awaiter.executor = &executor;
-    return writer_awaiter;
+  template<typename AwaiterImpl>
+  requires AwaiterImplRestriction<AwaiterImpl, typename AwaiterImpl::ResultType>
+  AwaiterImpl await_transform(AwaiterImpl &&awaiter) {
+    awaiter.install_executor(&executor);
+    return awaiter;
   }
 
   void get_result() {

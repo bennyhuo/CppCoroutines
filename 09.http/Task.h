@@ -13,6 +13,10 @@ struct Task {
 
   using promise_type = TaskPromise<ResultType, Executor>;
 
+  auto as_awaiter() {
+    return TaskAwaiter<ResultType, Executor>(std::move(*this));
+  }
+
   ResultType get_result() {
     return handle.promise().get_result();
   }
@@ -64,6 +68,10 @@ template<typename Executor>
 struct Task<void, Executor> {
 
   using promise_type = TaskPromise<void, Executor>;
+
+  auto as_awaiter() {
+    return TaskAwaiter<void, Executor>(std::move(*this));
+  }
 
   void get_result() {
     handle.promise().get_result();

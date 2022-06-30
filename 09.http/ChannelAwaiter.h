@@ -6,73 +6,63 @@
 #define CPPCOROUTINES_TASKS_07_CHANNEL_CHANNELAWAITER_H_
 
 #include "coroutine_common.h"
+#include "CommonAwaiter.h"
 
 template<typename ValueType>
 struct Channel;
 
 template<typename ValueType>
-struct WriterAwaiter {
+struct WriterAwaiter : public Awaiter<void> {
   Channel<ValueType> *channel;
-  AbstractExecutor *executor = nullptr;
   ValueType _value;
-  std::coroutine_handle<> handle;
 
-  bool await_ready() {
-    return false;
-  }
+  WriterAwaiter(Channel<ValueType> *channel, ValueType value) : channel(channel), _value(value) {}
 
-  auto await_suspend(std::coroutine_handle<> coroutine_handle) {
-    this->handle = coroutine_handle;
+  WriterAwaiter(WriterAwaiter &&other) noexcept
+      : Awaiter(other),
+        channel(std::exchange(other.channel, nullptr)),
+        _value(other._value) {}
+
+  void after_suspend() override {
     channel->try_push_writer(this);
   }
 
-  void await_resume() {
+  void before_resume() override {
     channel->check_closed();
+    channel = nullptr;
   }
 
-  void resume() {
-    if (executor) {
-      executor->execute([this]() { handle.resume(); });
-    } else {
-      handle.resume();
-    }
+  ~WriterAwaiter() {
+    if (channel) channel->remove_writer(this);
   }
 };
 
 template<typename ValueType>
-struct ReaderAwaiter {
+struct ReaderAwaiter : public Awaiter<ValueType> {
   Channel<ValueType> *channel;
-  AbstractExecutor *executor = nullptr;
-  ValueType _value;
-  ValueType* p_value = nullptr;
-  std::coroutine_handle<> handle;
+  ValueType *p_value = nullptr;
 
-  bool await_ready() { return false; }
+  explicit ReaderAwaiter(Channel<ValueType> *channel) : Awaiter<ValueType>(), channel(channel) {}
 
-  auto await_suspend(std::coroutine_handle<> coroutine_handle) {
-    this->handle = coroutine_handle;
+  ReaderAwaiter(ReaderAwaiter &&other) noexcept
+      : Awaiter<ValueType>(other),
+        channel(std::exchange(other.channel, nullptr)),
+        p_value(std::exchange(other.p_value, nullptr)) {}
+
+  void after_suspend() override {
     channel->try_push_reader(this);
   }
 
-  int await_resume() {
+  void before_resume() override {
     channel->check_closed();
-    return _value;
-  }
-
-  void resume(ValueType value) {
-    this->_value = value;
     if (p_value) {
-      *p_value = value;
+      *p_value = this->_result->get_or_throw();
     }
-    resume();
+    channel = nullptr;
   }
 
-  void resume() {
-    if (executor) {
-      executor->execute([this]() { handle.resume(); });
-    } else {
-      handle.resume();
-    }
+  ~ReaderAwaiter() {
+    if (channel) channel->remove_reader(this);
   }
 };
 

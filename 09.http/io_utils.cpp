@@ -36,7 +36,7 @@ std::stringstream &PrintTime(std::stringstream &ss) {
   // (remainder after division into seconds)
   auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
 
-  ss << std::put_time(std::localtime(&in_time_t), "%T")
+  ss << std::put_time(std::localtime(&in_time_t), "%R")
      << '.' << std::setfill('0') << std::setw(3) << ms.count();
   return ss;
 }

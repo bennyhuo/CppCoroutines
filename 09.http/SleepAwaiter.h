@@ -8,28 +8,23 @@
 #include "Executor.h"
 #include "Scheduler.h"
 #include "coroutine_common.h"
+#include "CommonAwaiter.h"
 
-struct SleepAwaiter {
+struct SleepAwaiter : Awaiter<void> {
 
-  explicit SleepAwaiter(AbstractExecutor *executor, long long duration) noexcept
-      : _executor(executor), _duration(duration) {}
+  explicit SleepAwaiter(long long duration) noexcept
+      : _duration(duration) {}
 
-  bool await_ready() const { return false; }
+  template<typename _Rep, typename _Period>
+  explicit SleepAwaiter(std::chrono::duration<_Rep, _Period> &&duration) noexcept
+      : _duration(std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()) {}
 
-  void await_suspend(std::coroutine_handle<> handle) const {
+  void after_suspend() override {
     static Scheduler scheduler;
-
-    scheduler.execute([this, handle]() {
-      _executor->execute([handle]() {
-        handle.resume();
-      });
-    }, _duration);
+    scheduler.execute([this] { resume(); }, _duration);
   }
 
-  void await_resume() {}
-
  private:
-  AbstractExecutor *_executor;
   long long _duration;
 };
 
