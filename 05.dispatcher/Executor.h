@@ -9,6 +9,7 @@
 #include <mutex>
 #include <functional>
 #include <future>
+#include <map>
 #include "io_utils.h"
 
 class AbstractExecutor {
@@ -33,8 +34,28 @@ class NewThreadExecutor : public AbstractExecutor {
 class AsyncExecutor : public AbstractExecutor {
  public:
   void execute(std::function<void()> &&func) override {
-    auto future = std::async(func);
+    std::unique_lock lock(future_lock);
+    auto id = nextId++;
+    lock.unlock();
+
+    auto future = std::async([this, id, func](){
+      func();
+
+      std::unique_lock lock(future_lock);
+      // move future to stack so that it will be destroyed after unlocked.
+      auto f = std::move(this->futures[id]);
+      this->futures.erase(id);
+      lock.unlock();
+    });
+
+    lock.lock();
+    this->futures[id] = std::move(future);
+    lock.unlock();
   }
+ private:
+  std::mutex future_lock;
+  int nextId = 0;
+  std::map<int, std::future<void>> futures{};
 };
 
 class LooperExecutor : public AbstractExecutor {
