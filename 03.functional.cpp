@@ -8,6 +8,8 @@
 #include <thread>
 #include <functional>
 #include <list>
+#include <string>
+#include "io.h"
 
 template<typename T>
 struct Generator {
@@ -18,7 +20,7 @@ struct Generator {
     T value;
     bool is_ready = false;
 
-    std::suspend_always initial_suspend() { return {}; };
+    std::suspend_never initial_suspend() { return {}; };
 
     std::suspend_always final_suspend() noexcept { return {}; }
 
@@ -42,7 +44,7 @@ struct Generator {
   std::coroutine_handle<promise_type> handle;
 
   bool has_next() {
-    if (handle.done()) {
+    if (!handle || handle.done()) {
       return false;
     }
 
@@ -64,25 +66,28 @@ struct Generator {
     }
     throw ExhaustedException();
   }
-
+  
 //  template<typename U>
 //  Generator<U> map(std::function<U(T)> f) {
-//    while (has_next()) {
-//      co_yield f(next());
+//    auto up_stream = std::move(*this);
+//    while (up_stream.has_next()) {
+//      co_yield f(up_stream.next());
 //    }
 //  }
 
   template<typename F>
   Generator<std::invoke_result_t<F, T>> map(F f) {
-    while (has_next()) {
-      co_yield f(next());
+    auto up_steam = std::move(*this);
+    while (up_steam.has_next()) {
+      co_yield f(up_steam.next());
     }
   }
 
 //  template<typename U>
 //  Generator<U> flat_map(std::function<Generator<U>(T)> f) {
-//    while (has_next()) {
-//      auto generator = f(next());
+//    auto up_steam = std::move(*this);
+//    while (up_steam.has_next()) {
+//      auto generator = f(up_steam.next());
 //      while (generator.has_next()) {
 //        co_yield generator.next();
 //      }
@@ -91,8 +96,9 @@ struct Generator {
 
   template<typename F>
   std::invoke_result_t<F, T> flat_map(F f) {
-    while (has_next()) {
-      auto generator = f(next());
+    auto up_steam = std::move(*this);
+    while (up_steam.has_next()) {
+      auto generator = f(up_steam.next());
       while (generator.has_next()) {
         co_yield generator.next();
       }
@@ -100,16 +106,18 @@ struct Generator {
   }
 
   Generator take(int n) {
+    auto up_steam = std::move(*this);
     int i = 0;
-    while (i++ < n && has_next()) {
-      co_yield next();
+    while (i++ < n && up_steam.has_next()) {
+      co_yield up_steam.next();
     }
   }
 
   template<typename F>
   Generator take_while(F f) {
-    while (has_next()) {
-      T value = next();
+    auto up_steam = std::move(*this);
+    while (up_steam.has_next()) {
+      T value = up_steam.next();
       if (f(value)) {
         co_yield value;
       } else {
@@ -120,8 +128,9 @@ struct Generator {
 
   template<typename F>
   Generator filter(F f) {
-    while (has_next()) {
-      T value = next();
+    auto up_steam = std::move(*this);
+    while (up_steam.has_next()) {
+      T value = up_steam.next();
       if (f(value)) {
         co_yield value;
       }
@@ -250,5 +259,21 @@ int main() {
   std::cout << Generator<double>::from(1.0, 2.0, 3.0, 4, 5, 6.0f).sum() << std::endl;
   std::cout << Generator<double>::from(1.0, 2.0, 3.0, 4, 5, 6.0f).fold(1, [](auto acc, auto i) { return acc * i; })
             << std::endl;
+
+  auto seq = fibonacci().map([](auto i) {
+    return std::to_string(i);
+  });
+
+  for(int i = 0; i < 10; i++) {
+    std::cout << seq.next() << std::endl;
+  }
+
+  Generator<int> generator = Generator<int>::from(1, 2, 3, 4).map([](int i) {
+    return i * 2;
+  });
+
+  generator.for_each([](auto i) {
+    std::cout << i << std::endl;
+  });
   return 0;
 }

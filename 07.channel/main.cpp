@@ -9,13 +9,13 @@
 
 using namespace std::chrono_literals;
 
-Task<void, LooperExecutor> Producer(Channel<int> &channel) {
+Task<void, NoopExecutor> Producer(Channel<int> &channel) {
   int i = 0;
   while (i < 10) {
     debug("send: ", i);
 //    co_await channel.write(i++);
     co_await (channel << i++);
-    co_await 50ms;
+    // co_await 50ms;
   }
 
   co_await 5s;
@@ -30,7 +30,7 @@ Task<void, LooperExecutor> Consumer(Channel<int> &channel) {
       int received;
       co_await (channel >> received);
       debug("receive: ", received);
-      co_await 500ms;
+      //co_await 500ms;
     } catch (std::exception &e) {
       debug("exception: ", e.what());
     }
@@ -44,7 +44,7 @@ Task<void, LooperExecutor> Consumer2(Channel<int> &channel) {
     try {
       auto received = co_await channel.read();
       debug("receive2: ", received);
-      co_await 300ms;
+      // co_await 300ms;
     } catch (std::exception &e) {
       debug("exception2: ", e.what());
     }

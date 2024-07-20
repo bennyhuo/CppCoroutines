@@ -15,7 +15,7 @@ struct Generator {
     int value;
     bool is_ready = false;
 
-    std::suspend_always initial_suspend() { return {}; };
+    std::suspend_never initial_suspend() { return {}; };
 
     std::suspend_always final_suspend() noexcept { return {}; }
 
@@ -39,7 +39,7 @@ struct Generator {
   std::coroutine_handle<promise_type> handle;
 
   bool has_next() {
-    if (handle.done()) {
+    if (!handle || handle.done()) {
       return false;
     }
 
