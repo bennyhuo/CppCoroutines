@@ -98,7 +98,14 @@ FutureAwaiter<R> as_awaiter(std::future<R> &&future) {
   return FutureAwaiter(std::move(future));
 }
 
+Task<void> test1() {
+//  no matching overloaded function found
+//  co_await FakeAwaiter();
+  co_return;
+}
+
 Task<int, LooperExecutor> simple_task() {
+  // co_await test1();
   debug("task start ...");
   auto result2 = co_await simple_task2().as_awaiter();
   debug("returns from task2: ", result2);
@@ -125,12 +132,6 @@ void test_tasks() {
   } catch (std::exception &e) {
     debug("error: ", e.what());
   }
-}
-
-Task<void> test1() {
-//  no matching overloaded function found
-//  co_await FakeAwaiter();
-  co_return;
 }
 
 int main() {

@@ -6,6 +6,7 @@
 #include <ctime>
 #include <iomanip>
 #include <thread>
+#include <sstream>
 
 inline char separator() {
 #ifdef _WIN32

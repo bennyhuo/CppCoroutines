@@ -91,6 +91,10 @@ struct Awaiter<void> {
     });
   }
 
+  void resume_unsafe() {
+    dispatch([this]() { _handle.resume(); });
+  }
+
   void resume_exception(std::exception_ptr &&e) {
     dispatch([this, e]() {
       _result = Result<void>(static_cast<std::exception_ptr>(e));
